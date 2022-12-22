@@ -1,0 +1,623 @@
+clear;
+clc;
+close all;
+%%
+% Import the files: control/adj_network_idx
+fpi1=fopen('con2最终.txt');
+hline1 = textscan(fpi1, '%s', 1, 'delimiter', '\n');
+field1=textscan(hline1{1}{1},'%s');
+clear format;
+format1='%s';
+% format1=[format1,' %s'];
+for i=2:247
+    format1=[format1,' %f'];
+end
+lines1 =textscan(fpi1, format1,100000,'delimiter', '\t');
+genename1=lines1{1};
+pprofile1 = [];
+for i=2:247
+    pprofile1 = [pprofile1, lines1{i}];
+end
+fclose(fpi1);
+psize=size(pprofile1);
+for i=1:psize(1)
+    for j=1:psize(2)
+    pprofile11(i,j)=pprofile1(i,j)./sum(pprofile1(i,:));
+    end
+end
+% [m,n]=find(isnan(pprofile11));
+% pprofile11(m,:)=[];
+pprofile11=abs(zscore(log(1+pprofile11)));
+
+fid1=fopen('con2_edge1.txt');
+control_network={};
+j=0;
+while ~feof(fid1)
+    tline1=fgetl(fid1);
+    j=j+1;
+    control_network{j}=regexp(tline1, '\s+', 'split');
+end
+fclose(fid1);
+total_node_num=j;
+
+fid1=fopen('con2_weight1.txt');
+control_weight={};
+j=0;
+while ~feof(fid1)
+    tline1=fgetl(fid1);
+    j=j+1;
+    control_weight{j}=regexp(tline1, '\s+', 'split');
+end
+fclose(fid1);
+p_joint=[];
+weight_sum=zeros(psize(1),1);
+for na=1:length(control_weight)
+  legt_wegt(na)=length(control_weight{na});  
+end
+%联合概率
+for na=1:total_node_num
+        weight_sum(na)=weight_sum(na)+sum(str2num(char(reshape(control_weight{na},legt_wegt(na),1))))-na;
+     for n=2:length(control_network{na})%里面所包含的数量（center除外），-1是因为读取出来的长度比实际多
+        p_joint(na,n-1)=(str2num(control_weight{na}{n-1}))./weight_sum(na); 
+     end
+end
+% psize_=size(p_cond_);
+% for i=1:psize_(1)
+%     for j=1:psize_(2)
+%     p_cond(i,j)=p_cond_(i,j)./sum(p_cond_(i,:));
+%     end
+% end
+for na=1:total_node_num
+    for n=2:length(control_network{na})-1
+        center=control_network{na}{1};
+        center=str2num(center);%str2num将字符数组或字符串转换为数值数组
+        nei=control_network{na}{n};
+        ne=str2num(nei);
+      for j=1:psize(2) 
+         p_dis(na,j)=(abs(sum(abs(pprofile11(center,j)-pprofile11(n-1,j))))).^(1/2);
+         %p_dis(n-1,j)=p_dis(n-1,j)./sum(p_dis(n-1,:));
+      end
+    end
+end
+p_dis=abs(zscore(log(1+p_dis)));
+entropy_node=zeros(psize(1),1);
+%节点概率
+for na=1:total_node_num
+     for j=1:psize(2)
+     p_node(na,j)=p_dis(na,j)./sum(p_dis(na,:)); 
+     entropy_node(na)=entropy_node(na)-p_node(na,j).*pprofile11(na,j).*log(abs(pprofile11(na,j).*p_node(na,j)));
+end
+end
+max_legt_wegt=max(legt_wegt);
+p_cond=zeros(total_node_num,psize(2));
+ES_node=zeros(total_node_num,1);
+for na=1:total_node_num
+    for n=2:length(control_network{na})-1
+        center=control_network{na}{1};
+        center=str2num(center);%str2num将字符数组或字符串转换为数值数组
+        nei=control_network{na}{n};
+        ne=str2num(nei);
+      for j=1:psize(2)     
+        %条件概率
+         p_cond(na,n-1)=p_joint(na,n-1)./p_node(na,j);
+         entropy_cond(na,n-1)=-sum(pprofile11(n-1,j).*p_cond(na,n-1).*log(abs(pprofile11(n-1,j).*p_cond(na,n-1))));
+      end
+         ES_cond(na,n-1)=entropy_node(na)-entropy_cond(na,n-1);
+         ES_node(na)=ES_node(na)+abs(ES_cond(na,n-1))./(legt_wegt(na)-1);
+     end
+end
+%ES_node=zscore(ES_node);
+ES_node_=mean(ES_node);
+
+fpi2=fopen('con2+f+MP+stage0最终.txt');
+hline2 = textscan(fpi2, '%s', 1, 'delimiter', '\n');
+field2=textscan(hline2{1}{1},'%s');
+clear format;
+format2='%s';
+% format1=[format1,' %s'];
+for i=2:392
+    format2=[format2,' %f'];
+end
+lines2=textscan(fpi2, format2,100000,'delimiter', '\t');
+genename2=lines2{1};
+tempcase1= [];
+for i=2:392
+    tempcase1 = [tempcase1, lines2{i}];
+end
+fclose(fpi2);
+psize0=size(tempcase1);
+for i=1:psize0(1)
+    for j=1:psize0(2)
+    tempcase11(i,j)=tempcase1(i,j)./sum(tempcase1(i,:));
+    end
+end
+tempcase11=abs(zscore(log(1+tempcase11)));
+
+fid2=fopen('con2+f+MP+stage0_edge.txt');
+stage0_network={};
+j=0;
+while ~feof(fid2)
+    tline2=fgetl(fid2);
+    j=j+1;
+    stage0_network{j}=regexp(tline2, '\s+', 'split');
+end
+fclose(fid2);
+total_node_num0=j;
+
+fid2=fopen('con2+f+MP+stage0_weight.txt');
+stage0_weight={};
+j=0;
+while ~feof(fid2)
+    tline2=fgetl(fid2);
+    j=j+1;
+    stage0_weight{j}=regexp(tline2, '\s+', 'split');
+end
+fclose(fid2);
+p_cond0_=[];
+weight_sum0=zeros(length(stage0_weight),1);
+for na=1:total_node_num0
+  legt_wegt0(na)=length(stage0_weight{na});  
+end
+for na=1:total_node_num0
+        weight_sum0(na)=weight_sum0(na)+sum(str2num(char(reshape(stage0_weight{na},legt_wegt0(na),1))))-na;
+     for n=2:length(stage0_network{na})-1      %里面所包含的数量（center除外），-1是因为读取出来的长度比实际多1
+        p_joint0(na,n-1)=(str2num(stage0_weight{na}{n-1}))./weight_sum0(na); 
+     end
+end
+
+for na=1:total_node_num0
+    for n=2:length(stage0_network{na})-1
+        center=stage0_network{na}{1};
+        center=str2num(center);%str2num将字符数组或字符串转换为数值数组
+        nei=stage0_network{na}{n};
+        ne=str2num(nei);
+      for j=1:psize0(2) 
+         p_dis0(na,j)=(abs(sum(abs(tempcase11(center,j)-tempcase11(n-1,j))))).^(1/2);
+         %p_dis(n-1,j)=p_dis(n-1,j)./sum(p_dis(n-1,:));
+      end
+    end
+end
+p_dis0=abs(zscore(log(1+p_dis0)));
+entropy_node0=zeros(psize0(1),1);
+for na=1:total_node_num0
+     for j=1:psize0(2)
+     p_node0(na,j)=p_dis0(na,j)./sum(p_dis0(na,:)); 
+     entropy_node0(na)=entropy_node0(na)-p_node0(na,j).*tempcase11(na,j).*log(abs(tempcase11(na,j).*p_node0(na,j)));
+end
+end
+max_legt_wegt0=max(legt_wegt0);
+p_cond0=zeros(total_node_num0,psize0(2));
+ES_node0=zeros(total_node_num0,1);
+for na=1:total_node_num0
+    for n=2:length(stage0_network{na})-1
+        center=stage0_network{na}{1};
+        center=str2num(center);%str2num将字符数组或字符串转换为数值数组
+        nei=stage0_network{na}{n};
+        ne=str2num(nei);
+      for j=1:psize0(2)     
+        %条件概率
+         p_cond0(na,n-1)=p_joint0(na,n-1)./p_node0(na,j);
+         entropy_cond0(na,n-1)=-sum(tempcase11(n-1,j).*p_cond0(na,n-1).*log(abs(tempcase11(n-1,j).*p_cond0(na,n-1))));
+      end
+         ES_cond0(na,n-1)=entropy_node0(na)-entropy_cond0(na,n-1);
+         ES_node0(na)=ES_node0(na)+abs(ES_cond0(na,n-1))./(legt_wegt0(na)-1);
+     end
+end
+%ES_node0=zscore(ES_node0);
+ES_node00=mean(ES_node0);
+stage0=abs(ES_node00-ES_node_);
+
+%%%
+fpi3=fopen('con2+stageI最终.txt');
+hline3 = textscan(fpi3, '%s', 1, 'delimiter', '\n');
+field3=textscan(hline3{1}{1},'%s');
+clear format;
+format3='%s';
+% format1=[format1,' %s'];
+for i=2:322
+    format3=[format3,' %f'];
+end
+lines3=textscan(fpi3, format3,100000,'delimiter', '\t');
+genename3=lines3{1};
+tempcase2= [];
+for i=2:322
+    tempcase2 = [tempcase2, lines3{i}];
+end
+fclose(fpi3);
+psize1=size(tempcase2);
+for i=1:psize1(1)
+    for j=1:psize1(2)
+    tempcase22(i,j)=tempcase2(i,j)./sum(tempcase2(i,:));
+    end
+end
+tempcase22=abs(zscore(log(1+tempcase22)));
+fid3=fopen('con2+stageI_edge.txt');
+stageI_network={};
+j=0;
+while ~feof(fid3)
+    tline3=fgetl(fid3);
+    j=j+1;
+    stageI_network{j}=regexp(tline3, '\s+', 'split');
+end
+fclose(fid3);
+total_node_num1=j;
+
+fid3=fopen('con2+stageI_weight.txt');
+stageI_weight={};
+j=0;
+while ~feof(fid3)
+    tline3=fgetl(fid3);
+    j=j+1;
+    stageI_weight{j}=regexp(tline3, '\s+', 'split');
+end
+fclose(fid3);
+weight_sum1=zeros(length(stageI_weight),1);
+for na=1:total_node_num1
+  legt_wegt1(na)=length(stageI_weight{na});  
+end
+for na=1:total_node_num1
+        weight_sum1(na)=weight_sum1(na)+sum(str2num(char(reshape(stageI_weight{na},legt_wegt1(na),1))))-na;
+     for n=2:length(stageI_network{na})-1%里面所包含的数量（center除外），-1是因为读取出来的长度比实际多1
+        p_joint1(na,n-1)=(str2num(stageI_weight{na}{n-1}))./weight_sum1(na); 
+     end
+end
+
+for na=1:total_node_num1
+    for n=2:length(stageI_network{na})-1
+        center=stageI_network{na}{1};
+        center=str2num(center);%str2num将字符数组或字符串转换为数值数组
+        nei=stageI_network{na}{n};
+        ne=str2num(nei);
+      for j=1:psize1(2) 
+         p_dis1(na,j)=(abs(sum(abs(tempcase22(center,j)-tempcase22(n-1,j))))).^(1/2);
+         %p_dis(n-1,j)=p_dis(n-1,j)./sum(p_dis(n-1,:));
+      end
+    end
+end
+p_dis1=abs(zscore(log(1+p_dis1)));
+entropy_node1=zeros(psize1(1),1);
+for na=1:total_node_num1
+     for j=1:psize1(2)
+     p_node1(na,j)=p_dis1(na,j)./sum(p_dis1(na,:)); 
+     entropy_node1(na)=entropy_node1(na)-p_node1(na,j).*tempcase22(na,j).*log(abs(tempcase22(na,j).*p_node1(na,j)));
+end
+end
+max_legt_wegt1=max(legt_wegt1);
+p_cond1=zeros(total_node_num1,psize1(2));
+ES_node1=zeros(total_node_num1,1);
+for na=1:total_node_num1
+    for n=2:length(stageI_network{na})-1
+        center=stageI_network{na}{1};
+        center=str2num(center);%str2num将字符数组或字符串转换为数值数组
+        nei=stageI_network{na}{n};
+        ne=str2num(nei);
+      for j=1:psize1(2)     
+        %条件概率
+         p_cond1(na,n-1)=p_joint1(na,n-1)./p_node1(na,j);
+         entropy_cond1(na,n-1)=-sum(tempcase22(n-1,j).*p_cond1(na,n-1).*log(abs(tempcase22(n-1,j).*p_cond1(na,n-1))));
+      end
+         ES_cond1(na,n-1)=entropy_node1(na)-entropy_cond1(na,n-1);
+         ES_node1(na)=ES_node1(na)+abs(ES_cond1(na,n-1))./(legt_wegt1(na)-1);
+     end
+end
+%ES_node1=zscore(ES_node1);
+ES_node11=mean(ES_node1);
+stageI=abs(ES_node11-ES_node_);
+%%%
+fpi4=fopen('con2+stageII最终.txt');
+hline4 = textscan(fpi4, '%s', 1, 'delimiter', '\n');
+field4=textscan(hline4{1}{1},'%s');
+clear format;
+format4='%s';
+% format1=[format1,' %s'];
+for i=2:283
+    format4=[format4,' %f'];
+end
+lines4=textscan(fpi4, format4,100000,'delimiter', '\t');
+genename4=lines4{1};
+tempcase3= [];
+for i=2:283
+    tempcase3 = [tempcase3, lines4{i}];
+end
+fclose(fpi4);
+psize2=size(tempcase3);
+for i=1:psize2(1)
+    for j=1:psize2(2)
+    tempcase33(i,j)=tempcase3(i,j)./sum(tempcase3(i,:));
+    end
+end
+tempcase33=abs(zscore(log(1+tempcase33)));
+fid4=fopen('con2+stageII_edge.txt');
+stageII_network={};
+j=0;
+while ~feof(fid4)
+    tline4=fgetl(fid4);
+    j=j+1;
+    stageII_network{j}=regexp(tline4, '\s+', 'split');
+end
+fclose(fid4);
+total_node_num2=j;
+
+fid4=fopen('con2+stageII_weight.txt');
+stageII_weight={};
+j=0;
+while ~feof(fid4)
+    tline4=fgetl(fid4);
+    j=j+1;
+    stageII_weight{j}=regexp(tline4, '\s+', 'split');
+end
+fclose(fid4);
+p_cond2=[];
+weight_sum2=zeros(length(stageII_weight),1);
+for na=1:length(stageII_weight)
+  legt_wegt2(na)=length(stageII_weight{na});  
+end
+%联合概率
+for na=1:total_node_num2
+        weight_sum2(na)=weight_sum2(na)+sum(str2num(char(reshape(stageII_weight{na},legt_wegt2(na),1))))-na;
+     for n=2:length(stageII_network{na})%里面所包含的数量（center除外），-1是因为读取出来的长度比实际多
+        p_joint2(na,n-1)=(str2num(stageII_weight{na}{n-1}))./weight_sum2(na); 
+     end
+end
+for na=1:total_node_num2
+    for n=2:length(stageII_network{na})-1
+        center=stageII_network{na}{1};
+        center=str2num(center);%str2num将字符数组或字符串转换为数值数组
+        nei=stageII_network{na}{n};
+        ne=str2num(nei);
+      for j=1:psize2(2) 
+         p_dis2(na,j)=(abs(sum(abs(tempcase33(center,j)-tempcase33(n-1,j))))).^(1/2);
+         %p_dis(n-1,j)=p_dis(n-1,j)./sum(p_dis(n-1,:));
+      end
+    end
+end
+p_dis2=abs(zscore(log(1+p_dis2)));
+entropy_node2=zeros(psize2(1),1);
+%节点概率
+for na=1:total_node_num2
+     for j=1:psize2(2)
+     p_node2(na,j)=p_dis2(na,j)./sum(p_dis2(na,:)); 
+     entropy_node2(na)=entropy_node2(na)-p_node2(na,j).*tempcase33(na,j).*log(abs(tempcase33(na,j).*p_node2(na,j)));
+end
+end
+max_legt_wegt2=max(legt_wegt2);
+p_cond2=zeros(total_node_num2,psize2(2));
+ES_node2=zeros(total_node_num2,1);
+for na=1:total_node_num2
+    for n=2:length(stageII_network{na})-1
+        center=stageII_network{na}{1};
+        center=str2num(center);%str2num将字符数组或字符串转换为数值数组
+        nei=stageII_network{na}{n};
+        ne=str2num(nei);
+      for j=1:psize2(2)     
+        %条件概率
+         p_cond2(na,n-1)=p_joint2(na,n-1)./p_node2(na,j);
+         entropy_cond2(na,n-1)=-sum(tempcase33(n-1,j).*p_cond2(na,n-1).*log(abs(tempcase33(n-1,j).*p_cond2(na,n-1))));
+      end
+         ES_cond2(na,n-1)=entropy_node2(na)-entropy_cond2(na,n-1);
+         ES_node2(na)=ES_node2(na)+abs(ES_cond2(na,n-1))./(legt_wegt2(na)-1);
+     end
+end
+%ES_node2=zscore(ES_node2);
+ES_node22=mean(ES_node2);
+stageII=abs(ES_node22-ES_node_);
+%%%
+fpi5=fopen('con2+stageIII最终.txt');
+hline5=textscan(fpi5, '%s', 1, 'delimiter', '\n');
+field5=textscan(hline5{1}{1},'%s');
+clear format;
+format5='%s';
+% format1=[format1,' %s'];
+for i=2:299
+    format5=[format5,' %f'];
+end
+lines5=textscan(fpi5, format5,100000,'delimiter', '\t');
+genename5=lines5{1};
+tempcase4= [];
+for i=2:299
+    tempcase4 = [tempcase4, lines5{i}];
+end
+fclose(fpi5);
+psize3=size(tempcase4);
+for i=1:psize3(1)
+    for j=1:psize3(2)
+    tempcase44(i,j)=tempcase4(i,j)./sum(tempcase4(i,:));
+    end
+end
+tempcase44=abs(zscore(log(1+tempcase44)));
+fid5=fopen('con2+stageIII_edge.txt');
+stageIII_network={};
+j=0;
+while ~feof(fid5)
+    tline5=fgetl(fid5);
+    j=j+1;
+    stageIII_network{j}=regexp(tline5, '\s+', 'split');
+end
+fclose(fid5);
+total_node_num3=j;
+
+fid5=fopen('con2+stageIII_weight.txt');
+stageIII_weight={};
+j=0;
+while ~feof(fid5)
+    tline5=fgetl(fid5);
+    j=j+1;
+    stageIII_weight{j}=regexp(tline5, '\s+', 'split');
+end
+fclose(fid5);
+p_cond3=[];
+weight_sum3=zeros(length(stageIII_weight),1);
+for na=1:length(stageIII_weight)
+  legt_wegt3(na)=length(stageIII_weight{na});  
+end
+%联合概率
+for na=1:total_node_num3
+        weight_sum3(na)=weight_sum3(na)+sum(str2num(char(reshape(stageIII_weight{na},legt_wegt3(na),1))))-na;
+     for n=2:length(stageIII_network{na})%里面所包含的数量（center除外），-1是因为读取出来的长度比实际多
+        p_joint3(na,n-1)=(str2num(stageIII_weight{na}{n-1}))./weight_sum3(na); 
+     end
+end
+for na=1:total_node_num3
+    for n=2:length(stageIII_network{na})-1
+        center=stageIII_network{na}{1};
+        center=str2num(center);%str2num将字符数组或字符串转换为数值数组
+        nei=stageIII_network{na}{n};
+        ne=str2num(nei);
+      for j=1:psize3(2) 
+         p_dis3(na,j)=(abs(sum(abs(tempcase44(center,j)-tempcase44(n-1,j))))).^(1/2);
+         %p_dis(n-1,j)=p_dis(n-1,j)./sum(p_dis(n-1,:));
+      end
+    end
+end
+p_dis3=abs(zscore(log(1+p_dis3)));
+entropy_node3=zeros(psize3(1),1);
+%节点概率
+for na=1:total_node_num3
+     for j=1:psize3(2)
+     p_node3(na,j)=p_dis3(na,j)./sum(p_dis3(na,:)); 
+     entropy_node3(na)=entropy_node3(na)-p_node3(na,j).*tempcase44(na,j).*log(abs(tempcase44(na,j).*p_node3(na,j)));
+end
+end
+max_legt_wegt3=max(legt_wegt3);
+p_cond3=zeros(total_node_num3,psize3(2));
+ES_node3=zeros(total_node_num3,1);
+for na=1:total_node_num3
+    for n=2:length(stageIII_network{na})-1
+        center=stageIII_network{na}{1};
+        center=str2num(center);%str2num将字符数组或字符串转换为数值数组
+        nei=stageIII_network{na}{n};
+        ne=str2num(nei);
+      for j=1:psize3(2)     
+        %条件概率
+         p_cond3(na,n-1)=p_joint3(na,n-1)./p_node3(na,j);
+         entropy_cond3(na,n-1)=-sum(tempcase44(n-1,j).*p_cond3(na,n-1).*log(abs(tempcase44(n-1,j).*p_cond3(na,n-1))));
+      end
+         ES_cond3(na,n-1)=entropy_node3(na)-entropy_cond3(na,n-1);
+         ES_node3(na)=ES_node3(na)+abs(ES_cond3(na,n-1))./(legt_wegt3(na)-1);
+     end
+end
+%ES_node3=zscore(ES_node3);
+ES_node33=mean(ES_node3);
+stageIII=abs(ES_node33-ES_node_);
+
+%%%
+fpi6=fopen('con2+stageIV最终.txt');
+hline6=textscan(fpi6, '%s', 1, 'delimiter', '\n');
+field6=textscan(hline6{1}{1},'%s');
+clear format;
+format6='%s';
+% format1=[format1,' %s'];
+for i=2:269
+    format6=[format6,' %f'];
+end
+lines6=textscan(fpi6, format6,100000,'delimiter', '\t');
+genename6=lines6{1};
+tempcase5= [];
+for i=2:269
+    tempcase5 = [tempcase5, lines6{i}];
+end
+fclose(fpi6);
+psize4=size(tempcase5);
+for i=1:psize4(1)
+    for j=1:psize4(2)
+    tempcase55(i,j)=tempcase5(i,j)./sum(tempcase5(i,:));
+    end
+end
+tempcase55=abs(zscore(log(1+tempcase55)));
+fid6=fopen('con2+stageIV_edge.txt');
+stageIV_network={};
+j=0;
+while ~feof(fid6)
+    tline6=fgetl(fid6);
+    j=j+1;
+    stageIV_network{j}=regexp(tline6, '\s+', 'split');
+end
+fclose(fid6);
+total_node_num4=j;
+
+fid6=fopen('con2+stageIV_weight.txt');
+stageIV_weight={};
+j=0;
+while ~feof(fid6)
+    tline6=fgetl(fid6);
+    j=j+1;
+    stageIV_weight{j}=regexp(tline6, '\s+', 'split');
+end
+fclose(fid6);
+p_cond4=[];
+weight_sum4=zeros(length(stageIV_weight),1);
+for na=1:length(stageIV_weight)
+  legt_wegt4(na)=length(stageIV_weight{na});  
+end
+%联合概率
+for na=1:total_node_num4
+        weight_sum4(na)=weight_sum4(na)+sum(str2num(char(reshape(stageIV_weight{na},legt_wegt4(na),1))))-na;
+     for n=2:length(stageIV_network{na})%里面所包含的数量（center除外），-1是因为读取出来的长度比实际多
+        p_joint4(na,n-1)=(str2num(stageIV_weight{na}{n-1}))./weight_sum4(na); 
+     end
+end
+for na=1:total_node_num4
+    for n=2:length(stageIV_network{na})-1
+        center=stageIV_network{na}{1};
+        center=str2num(center);%str2num将字符数组或字符串转换为数值数组
+        nei=stageIV_network{na}{n};
+        ne=str2num(nei);
+      for j=1:psize4(2) 
+         p_dis4(na,j)=(abs(sum(abs(tempcase55(center,j)-tempcase55(n-1,j))))).^(1/2);
+         %p_dis(n-1,j)=p_dis(n-1,j)./sum(p_dis(n-1,:));
+      end
+    end
+end
+p_dis4=abs(zscore(log(1+p_dis4)));
+entropy_node4=zeros(psize4(1),1);
+%节点概率
+for na=1:total_node_num4
+     for j=1:psize4(2)
+     p_node4(na,j)=p_dis4(na,j)./sum(p_dis4(na,:)); 
+     entropy_node4(na)=entropy_node4(na)-p_node4(na,j).*tempcase55(na,j).*log(abs(tempcase55(na,j).*p_node4(na,j)));
+end
+end
+max_legt_wegt4=max(legt_wegt4);
+p_cond4=zeros(total_node_num4,psize4(2));
+ES_node4=zeros(total_node_num4,1);
+for na=1:total_node_num4
+    for n=2:length(stageIV_network{na})-1
+        center=stageIV_network{na}{1};
+        center=str2num(center);%str2num将字符数组或字符串转换为数值数组
+        nei=stageIV_network{na}{n};
+        ne=str2num(nei);
+      for j=1:psize4(2)     
+        %条件概率
+         p_cond4(na,n-1)=p_joint4(na,n-1)./p_node4(na,j);
+         entropy_cond4(na,n-1)=-sum(tempcase55(n-1,j).*p_cond4(na,n-1).*log(abs(tempcase55(n-1,j).*p_cond4(na,n-1))));
+      end
+         ES_cond4(na,n-1)=entropy_node4(na)-entropy_cond4(na,n-1);
+         ES_node4(na)=ES_node4(na)+abs(ES_cond4(na,n-1))./(legt_wegt4(na)-1);
+     end
+end 
+%ES_node4=zscore(ES_node4);
+ES_node44=mean(ES_node4);
+stageIV=abs(ES_node44-ES_node_);
+
+score=[stage0,stageI,stageII,stageIII,stageIV];
+figure('NumberTitle', 'off', 'Name', 'Disturbance Information Gain');
+plot([1:1:5],score,'r','LineWidth',3);
+set(gca,'XTick',1:5);
+B={'stage0' 'stageI' 'stageII' 'stageIII'  'stageIV'};
+set(gca,'XTickLabel',B);
+xlabel('stage');
+ylabel('score');
+title('species');
+
+xlswrite('stage0_name.xlsx',genename2);
+xlswrite('stageI_name.xlsx',genename3);
+xlswrite('stageII_name.xlsx',genename4);
+xlswrite('stageIII_name.xlsx',genename5);
+xlswrite('stageIV_name.xlsx',genename6);
+
+
+xlswrite('stage0_score.xlsx',ES_node);
+xlswrite('stageI_score.xlsx',ES_node1);
+xlswrite('stageII_score.xlsx',ES_node2);
+xlswrite('stageIII_score.xlsx',ES_node3);
+xlswrite('stageIV_score.xlsx',ES_node4);
